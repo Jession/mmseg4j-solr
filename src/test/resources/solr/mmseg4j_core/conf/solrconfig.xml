@@ -30,257 +30,315 @@
 
 <config>
 
-  <jmx />
+    <jmx/>
 
-  <!-- Used to specify an alternate directory to hold all index data.
-       It defaults to "index" if not present, and should probably
-       not be changed if replication is in use. -->
-  <dataDir>${solr.data.dir:}</dataDir>
+    <!-- Used to specify an alternate directory to hold all index data.
+         It defaults to "index" if not present, and should probably
+         not be changed if replication is in use. -->
+    <dataDir>${solr.data.dir:}</dataDir>
 
-  <!--  The DirectoryFactory to use for indexes.
-        solr.StandardDirectoryFactory, the default, is filesystem based.
-        solr.RAMDirectoryFactory is memory based and not persistent. -->
-  <directoryFactory name="DirectoryFactory" class="${solr.directoryFactory:solr.RAMDirectoryFactory}">
-    <double name="maxWriteMBPerSecDefault">1000000</double>
-    <double name="maxWriteMBPerSecFlush">2000000</double>
-    <double name="maxWriteMBPerSecMerge">3000000</double>
-    <double name="maxWriteMBPerSecRead">4000000</double>
-  </directoryFactory>
+    <!--  The DirectoryFactory to use for indexes.
+          solr.StandardDirectoryFactory, the default, is filesystem based.
+          solr.RAMDirectoryFactory is memory based and not persistent. -->
+    <directoryFactory name="DirectoryFactory" class="${solr.directoryFactory:solr.NRTCachingDirectoryFactory}">
+        <!--<double name="maxWriteMBPerSecDefault">1000000</double>-->
+        <!--<double name="maxWriteMBPerSecFlush">2000000</double>-->
+        <!--<double name="maxWriteMBPerSecMerge">3000000</double>-->
+        <!--<double name="maxWriteMBPerSecRead">4000000</double>-->
+    </directoryFactory>
 
-  <luceneMatchVersion>${tests.luceneMatchVersion:LUCENE_CURRENT}</luceneMatchVersion>
+    <codecFactory class="solr.SchemaCodecFactory"/>
 
-  <indexConfig>
-    <mergeScheduler class="org.apache.lucene.index.ConcurrentMergeScheduler"/>
-    <writeLockTimeout>1000</writeLockTimeout>
-    <mergeFactor>8</mergeFactor>
+    <luceneMatchVersion>${tests.luceneMatchVersion:LUCENE_CURRENT}</luceneMatchVersion>
 
-    <!-- for better multi-segment testing, we are using slower
-    indexing properties of maxBufferedDocs=10 and LogDocMergePolicy.
+    <indexConfig>
+        <!--<mergeScheduler class="org.apache.lucene.index.ConcurrentMergeScheduler"/>-->
+        <!--<writeLockTimeout>1000</writeLockTimeout>-->
+        <!--<mergeFactor>8</mergeFactor>-->
+
+        <!--&lt;!&ndash; for better multi-segment testing, we are using slower-->
+        <!--indexing properties of maxBufferedDocs=10 and LogDocMergePolicy.-->
+        <!--&ndash;&gt;-->
+        <!--<maxBufferedDocs>10</maxBufferedDocs>-->
+        <!--<mergePolicy class="org.apache.lucene.index.LogDocMergePolicy"/>-->
+        <lockType>${solr.lock.type:native}</lockType>
+        <infoStream>true</infoStream>
+    </indexConfig>
+
+    <updateHandler class="solr.DirectUpdateHandler2">
+
+        <!-- autocommit pending docs if certain criteria are met
+        <autoCommit>
+          <maxDocs>10000</maxDocs>
+          <maxTime>3600000</maxTime>
+        </autoCommit>
+        -->
+        <!-- represents a lower bound on the frequency that commits may
+        occur (in seconds). NOTE: not yet implemented
+
+        <commitIntervalLowerBound>0</commitIntervalLowerBound>
+        -->
+
+        <!-- The RunExecutableListener executes an external command.
+             exe - the name of the executable to run
+             dir - dir to use as the current working directory. default="."
+             wait - the calling thread waits until the executable returns. default="true"
+             args - the arguments to pass to the program.  default=nothing
+             env - environment variables to set.  default=nothing
+          -->
+        <!-- A postCommit event is fired after every commit
+        <listener event="postCommit" class="solr.RunExecutableListener">
+          <str name="exe">/var/opt/resin3/__PORT__/scripts/solr/snapshooter</str>
+          <str name="dir">/var/opt/resin3/__PORT__</str>
+          <bool name="wait">true</bool>
+          <arr name="args"> <str>arg1</str> <str>arg2</str> </arr>
+          <arr name="env"> <str>MYVAR=val1</str> </arr>
+        </listener>
+        -->
+
+        <updateLog>
+            <str name="dir">${solr.ulog.dir:}</str>
+            <int name="numVersionBuckets">${solr.ulog.numVersionBuckets:65536}</int>
+        </updateLog>
+
+        <autoCommit>
+            <maxTime>${solr.autoCommit.maxTime:15000}</maxTime>
+            <openSearcher>false</openSearcher>
+        </autoCommit>
+
+        <autoSoftCommit>
+            <maxTime>${solr.autoSoftCommit.maxTime:-1}</maxTime>
+        </autoSoftCommit>
+
+    </updateHandler>
+
+
+    <query>
+        <!-- Maximum number of clauses in a boolean query... can affect
+            range or wildcard queries that expand to big boolean
+            queries.  An exception is thrown if exceeded.
+        -->
+        <maxBooleanClauses>1024</maxBooleanClauses>
+
+
+        <!-- Cache specification for Filters or DocSets - unordered set of *all* documents
+             that match a particular query.
+          -->
+        <filterCache
+                class="solr.search.FastLRUCache"
+                size="512"
+                initialSize="512"
+                autowarmCount="0"/>
+
+        <queryResultCache
+                class="solr.search.LRUCache"
+                size="512"
+                initialSize="512"
+                autowarmCount="0"/>
+
+        <documentCache
+                class="solr.search.LRUCache"
+                size="512"
+                initialSize="512"
+                autowarmCount="0"/>
+
+        <cache name="perSegFilter"
+               class="solr.search.LRUCache"
+               size="10"
+               initialSize="0"
+               autowarmCount="10"
+               regenerator="solr.NoOpRegenerator"/>
+
+        <!-- If true, stored fields that are not requested will be loaded lazily.
+        -->
+        <enableLazyFieldLoading>true</enableLazyFieldLoading>
+
+        <!--
+
+        <cache name="myUserCache"
+          class="solr.search.LRUCache"
+          size="4096"
+          initialSize="1024"
+          autowarmCount="1024"
+          regenerator="MyRegenerator"
+          />
+        -->
+
+
+        <!--
+        <useFilterForSortedQuery>true</useFilterForSortedQuery>
+        -->
+
+        <queryResultWindowSize>10</queryResultWindowSize>
+
+        <queryResultMaxDocsCached>200</queryResultMaxDocsCached>
+
+        <useColdSearcher>false</useColdSearcher>
+
+        <maxWarmingSearchers>2</maxWarmingSearchers>
+
+        <!-- set maxSize artificially low to exercise both types of sets -->
+        <!--<HashDocSet maxSize="3" loadFactor="0.75"/>-->
+
+
+        <!-- boolToFilterOptimizer converts boolean clauses with zero boost
+             into cached filters if the number of docs selected by the clause exceeds
+             the threshold (represented as a fraction of the total index)
+        -->
+        <!--<boolTofilterOptimizer enabled="false" cacheSize="32" threshold=".05"/>-->
+
+
+        <!-- a newSearcher event is fired whenever a new searcher is being prepared
+             and there is a current searcher handling requests (aka registered). -->
+        <!-- QuerySenderListener takes an array of NamedList and executes a
+             local query request for each NamedList in sequence. -->
+        <!--
+        <listener event="newSearcher" class="solr.QuerySenderListener">
+          <arr name="queries">
+            <lst> <str name="q">solr</str> <str name="start">0</str> <str name="rows">10</str> </lst>
+            <lst> <str name="q">rocks</str> <str name="start">0</str> <str name="rows">10</str> </lst>
+          </arr>
+        </listener>
+        -->
+
+        <!-- a firstSearcher event is fired whenever a new searcher is being
+             prepared but there is no current registered searcher to handle
+             requests or to gain prewarming data from. -->
+        <!--
+        <listener event="firstSearcher" class="solr.QuerySenderListener">
+          <arr name="queries">
+            <lst> <str name="q">fast_warm</str> <str name="start">0</str> <str name="rows">10</str> </lst>
+          </arr>
+        </listener>
+        -->
+
+
+    </query>
+
+    <requestDispatcher handleSelect="false">
+        <requestParsers enableRemoteStreaming="true"
+                        multipartUploadLimitInKB="2048000"
+                        formdataUploadLimitInKB="2048"
+                        addHttpRequestToContext="false"/>
+        <httpCaching never304="true"/>
+    </requestDispatcher>
+
+    <requestHandler name="/select" class="solr.SearchHandler">
+        <!-- default values for query parameters can be specified, these
+          will be overridden by parameters in the request
+       -->
+        <lst name="defaults">
+            <str name="echoParams">explicit</str>
+            <int name="rows">10</int>
+        </lst>
+
+    </requestHandler>
+
+    <!-- A request handler that returns indented JSON by default -->
+    <requestHandler name="/query" class="solr.SearchHandler">
+        <lst name="defaults">
+            <str name="echoParams">explicit</str>
+            <str name="wt">json</str>
+            <str name="indent">true</str>
+            <str name="df">text</str>
+        </lst>
+    </requestHandler>
+
+    <initParams path="/update/**,/query,/select,/tvrh,/elevate,/spell">
+        <lst name="defaults">
+            <str name="df">text</str>
+        </lst>
+    </initParams>
+
+    <!-- Field Analysis Request Handler
+
+        RequestHandler that provides much the same functionality as
+        analysis.jsp. Provides the ability to specify multiple field
+        types and field names in the same request and outputs
+        index-time and query-time analysis for each of them.
+
+        Request parameters are:
+        analysis.fieldname - field name whose analyzers are to be used
+
+        analysis.fieldtype - field type whose analyzers are to be used
+        analysis.fieldvalue - text for index-time analysis
+        q (or analysis.q) - text for query time analysis
+        analysis.showmatch (true|false) - When set to true and when
+            query analysis is performed, the produced tokens of the
+            field value analysis will be marked as "matched" for every
+            token that is produces by the query analysis
     -->
-    <maxBufferedDocs>10</maxBufferedDocs>
-    <mergePolicy class="org.apache.lucene.index.LogDocMergePolicy"/>
-    <lockType>native</lockType>
-    <unlockOnStartup>true</unlockOnStartup>
-  </indexConfig>
+    <requestHandler name="/analysis/field"
+                    startup="lazy"
+                    class="solr.FieldAnalysisRequestHandler"/>
 
-  <updateHandler class="solr.DirectUpdateHandler2">
 
-    <!-- autocommit pending docs if certain criteria are met
-    <autoCommit>
-      <maxDocs>10000</maxDocs>
-      <maxTime>3600000</maxTime>
-    </autoCommit>
+    <!-- Document Analysis Handler
+
+        http://wiki.apache.org/solr/AnalysisRequestHandler
+
+        An analysis handler that provides a breakdown of the analysis
+        process of provided documents. This handler expects a (single)
+        content stream with the following format:
+
+        <docs>
+          <doc>
+            <field name="id">1</field>
+            <field name="name">The Name</field>
+            <field name="text">The Text Value</field>
+          </doc>
+          <doc>...</doc>
+          <doc>...</doc>
+          ...
+        </docs>
+
+     Note: Each document must contain a field which serves as the
+     unique key. This key is used in the returned response to associate
+     an analysis breakdown to the analyzed document.
+
+     Like the FieldAnalysisRequestHandler, this handler also supports
+     query analysis by sending either an "analysis.query" or "q"
+     request parameter that holds the query text to be analyzed. It
+     also supports the "analysis.showmatch" parameter which when set to
+     true, all field tokens that match the query tokens will be marked
+     as a "match".
     -->
-    <!-- represents a lower bound on the frequency that commits may
-    occur (in seconds). NOTE: not yet implemented
+    <requestHandler name="/analysis/document"
+                    class="solr.DocumentAnalysisRequestHandler"
+                    startup="lazy"/>
 
-    <commitIntervalLowerBound>0</commitIntervalLowerBound>
-    -->
+    <!-- Echo the request contents back to the client -->
+    <requestHandler name="/debug/dump" class="solr.DumpRequestHandler">
+        <lst name="defaults">
+            <str name="echoParams">explicit</str>
+            <str name="echoHandler">true</str>
+        </lst>
+    </requestHandler>
 
-    <!-- The RunExecutableListener executes an external command.
-         exe - the name of the executable to run
-         dir - dir to use as the current working directory. default="."
-         wait - the calling thread waits until the executable returns. default="true"
-         args - the arguments to pass to the program.  default=nothing
-         env - environment variables to set.  default=nothing
-      -->
-    <!-- A postCommit event is fired after every commit
-    <listener event="postCommit" class="solr.RunExecutableListener">
-      <str name="exe">/var/opt/resin3/__PORT__/scripts/solr/snapshooter</str>
-      <str name="dir">/var/opt/resin3/__PORT__</str>
-      <bool name="wait">true</bool>
-      <arr name="args"> <str>arg1</str> <str>arg2</str> </arr>
-      <arr name="env"> <str>MYVAR=val1</str> </arr>
-    </listener>
-    -->
+    <searchComponent name="query" class="solr.QueryComponent"/>
+    <searchComponent name="facet" class="solr.FacetComponent"/>
+    <searchComponent name="mlt" class="solr.MoreLikeThisComponent"/>
+    <searchComponent name="highlight" class="solr.HighlightComponent"/>
+    <searchComponent name="stats" class="solr.StatsComponent"/>
+    <searchComponent name="debug" class="solr.DebugComponent"/>
+    <!-- Terms Component
 
-    <updateLog enable="${enable.update.log:false}">
-  	  <str name="dir">${solr.ulog.dir:}</str>
-    </updateLog>
+           http://wiki.apache.org/solr/TermsComponent
 
-  </updateHandler>
+           A component to return terms and document frequency of those
+           terms
+        -->
+    <searchComponent name="terms" class="solr.TermsComponent"/>
 
-
-  <query>
-    <!-- Maximum number of clauses in a boolean query... can affect
-        range or wildcard queries that expand to big boolean
-        queries.  An exception is thrown if exceeded.
-    -->
-    <maxBooleanClauses>1024</maxBooleanClauses>
-
-
-    <!-- Cache specification for Filters or DocSets - unordered set of *all* documents
-         that match a particular query.
-      -->
-    <filterCache
-      class="solr.search.FastLRUCache"
-      size="512"
-      initialSize="512"
-      autowarmCount="2"/>
-
-    <!-- <queryResultCache
-      class="solr.search.LRUCache"
-      size="512"
-      initialSize="512"
-      autowarmCount="2"/> -->
-
-    <documentCache
-      class="solr.search.LRUCache"
-      size="512"
-      initialSize="512"
-      autowarmCount="0"/>
-
-    <!-- If true, stored fields that are not requested will be loaded lazily.
-    -->
-    <enableLazyFieldLoading>true</enableLazyFieldLoading>
-
-    <!--
-
-    <cache name="myUserCache"
-      class="solr.search.LRUCache"
-      size="4096"
-      initialSize="1024"
-      autowarmCount="1024"
-      regenerator="MyRegenerator"
-      />
-    -->
-
-
-    <!--
-    <useFilterForSortedQuery>true</useFilterForSortedQuery>
-    -->
-
-    <queryResultWindowSize>10</queryResultWindowSize>
-
-    <!-- set maxSize artificially low to exercise both types of sets -->
-    <HashDocSet maxSize="3" loadFactor="0.75"/>
-
-
-    <!-- boolToFilterOptimizer converts boolean clauses with zero boost
-         into cached filters if the number of docs selected by the clause exceeds
-         the threshold (represented as a fraction of the total index)
-    -->
-    <boolTofilterOptimizer enabled="false" cacheSize="32" threshold=".05"/>
-
-
-    <!-- a newSearcher event is fired whenever a new searcher is being prepared
-         and there is a current searcher handling requests (aka registered). -->
-    <!-- QuerySenderListener takes an array of NamedList and executes a
-         local query request for each NamedList in sequence. -->
-    <!--
-    <listener event="newSearcher" class="solr.QuerySenderListener">
-      <arr name="queries">
-        <lst> <str name="q">solr</str> <str name="start">0</str> <str name="rows">10</str> </lst>
-        <lst> <str name="q">rocks</str> <str name="start">0</str> <str name="rows">10</str> </lst>
-      </arr>
-    </listener>
-    -->
-
-    <!-- a firstSearcher event is fired whenever a new searcher is being
-         prepared but there is no current registered searcher to handle
-         requests or to gain prewarming data from. -->
-    <!--
-    <listener event="firstSearcher" class="solr.QuerySenderListener">
-      <arr name="queries">
-        <lst> <str name="q">fast_warm</str> <str name="start">0</str> <str name="rows">10</str> </lst>
-      </arr>
-    </listener>
-    -->
-
-
-  </query>
-
-  <queryResponseWriter name="xml" default="true"
-                       class="solr.XMLResponseWriter" />
-
-  <requestHandler name="/replication" class="solr.ReplicationHandler" startup="lazy" />
-
-  <!-- An alternate set representation that uses an integer hash to store filters (sets of docids).
-       If the set cardinality <= maxSize elements, then HashDocSet will be used instead of the bitset
-       based HashBitset. -->
-
-  <!-- requestHandler plugins... incoming queries will be dispatched to the
-     correct handler based on the 'qt' param matching the
-     name of registered handlers.
-      The "standard" request handler is the default and will be used if qt
-     is not specified in the request.
-  -->
-  <requestHandler name="standard" class="solr.StandardRequestHandler">
-  	<bool name="httpCaching">true</bool>
-  </requestHandler>
-
-  <requestHandler name="/get" class="solr.RealTimeGetHandler">
-     <lst name="defaults">
-       <str name="omitHeader">true</str>
-     </lst>
-  </requestHandler>
-
-
-  <requestHandler name="dismax" class="solr.SearchHandler" >
-    <lst name="defaults">
-     <str name="defType">dismax</str>
-     <str name="q.alt">*:*</str>
-     <float name="tie">0.01</float>
-     <str name="qf">
-        text^0.5 features_t^1.0 subject^1.4 title_stemmed^2.0
-     </str>
-     <str name="pf">
-        text^0.2 features_t^1.1 subject^1.4 title_stemmed^2.0 title^1.5
-     </str>
-     <str name="bf">
-        ord(weight)^0.5 recip(rord(iind),1,1000,1000)^0.3
-     </str>
-     <str name="mm">
-        3&lt;-1 5&lt;-2 6&lt;90%
-     </str>
-     <int name="ps">100</int>
-    </lst>
-  </requestHandler>
-
-  <requestHandler name="/admin/" class="org.apache.solr.handler.admin.AdminHandlers" />
-
-  <!-- test query parameter defaults -->
-  <requestHandler name="defaults" class="solr.StandardRequestHandler">
-    <lst name="defaults">
-      <int name="rows">4</int>
-      <bool name="hl">true</bool>
-      <str name="hl.fl">text,name,subject,title,whitetok</str>
-    </lst>
-  </requestHandler>
-
-  <!-- test query parameter defaults -->
-  <requestHandler name="lazy" class="solr.StandardRequestHandler" startup="lazy">
-    <lst name="defaults">
-      <int name="rows">4</int>
-      <bool name="hl">true</bool>
-      <str name="hl.fl">text,name,subject,title,whitetok</str>
-    </lst>
-  </requestHandler>
-
-  <requestHandler name="/update" class="solr.UpdateRequestHandler"  />
-
-  <requestHandler name="/mlt" class="solr.MoreLikeThisHandler">
-  </requestHandler>
-
-  <!-- enable streaming for testing... -->
-  <requestDispatcher handleSelect="true" >
-    <requestParsers enableRemoteStreaming="true" multipartUploadLimitInKB="2048" />
-    <httpCaching lastModifiedFrom="openTime" etagSeed="Solr" never304="false">
-      <cacheControl>max-age=30, public</cacheControl>
-    </httpCaching>
-  </requestDispatcher>
-
-  <!-- Echo the request contents back to the client -->
-  <requestHandler name="/debug/dump" class="solr.DumpRequestHandler" >
-    <lst name="defaults">
-      <str name="echoParams">explicit</str>
-      <str name="echoHandler">true</str>
-    </lst>
-  </requestHandler>
-
-  <admin>
-    <defaultQuery>solr</defaultQuery>
-    <gettableFiles>solrconfig.xml scheam.xml admin-extra.html</gettableFiles>
-  </admin>
+    <!-- A request handler for demonstrating the terms component -->
+    <requestHandler name="/terms" class="solr.SearchHandler" startup="lazy">
+        <lst name="defaults">
+            <bool name="terms">true</bool>
+            <bool name="distrib">false</bool>
+        </lst>
+        <arr name="components">
+            <str>terms</str>
+        </arr>
+    </requestHandler>
 
 </config>
